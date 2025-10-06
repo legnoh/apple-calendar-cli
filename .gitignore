@@ -1,0 +1,17 @@
+# Swift Package Manager build files
+.build/
+Package.resolved
+
+# Distribution binaries
+dist/
+
+# Xcode files
+*.xcodeproj
+*.xcworkspace
+DerivedData/
+
+# macOS files
+.DS_Store
+
+# VS Code files (optional, comment out if you want to share VS Code settings)
+# .vscode/
