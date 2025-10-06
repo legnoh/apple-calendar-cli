@@ -134,7 +134,7 @@ final class EventStoreService: LifecycleHandler, @unchecked Sendable {
 }
 
 @main
-struct AppMain {
+enum AppMain {
     static func main() async throws {
         // 設定ファイルを読み込み
         let config = Config.load()

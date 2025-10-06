@@ -36,7 +36,7 @@ jobs:
       run: swift package resolve
       
     - name: Build for release
-      run: swift build -c release --arch arm64 --arch x86_64
+      run: swift build -c release --arch arm64 --arch x86_64 -Xswiftc -parse-as-library
       
     - name: Create artifacts directory
       run: mkdir -p artifacts
