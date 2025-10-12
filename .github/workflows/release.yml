@@ -286,12 +286,11 @@ jobs:
           end
         end
         EOF
-        cat ${FORMULA_PATH}
-        git status
-        git add --all
+        cp ${FORMULA_PATH}
         pushd "$TMP" >/dev/null
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add ${FORMULA_PATH}
         if git diff --quiet; then
           echo "No changes to formula; skipping commit."
         else
