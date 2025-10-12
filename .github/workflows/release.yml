@@ -1,4 +1,4 @@
-name: Release
+name: Release (apple-calendar-cli)
 
 on:
   push:
@@ -43,95 +43,43 @@ jobs:
       
     - name: Copy binary to artifacts
       run: |
-        cp .build/apple/Products/Release/mcjs artifacts/
-        chmod +x artifacts/mcjs
+        cp .build/apple/Products/Release/apple-calendar-cli artifacts/
+        chmod +x artifacts/apple-calendar-cli
         
-    - name: Create launch script
-      run: |
-        cat > artifacts/launch_terminal.sh << 'EOF'
-        #!/bin/bash
-        
-        # Get the directory of this script
-        DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-        
-        # Launch mcjs in a new Terminal tab
-        osascript -e "
-        tell application \"Terminal\"
-            if not (exists window 1) then reopen
-            activate
-            do script \"cd '$DIR' && echo '🚀 Starting mcjs...' && ./mcjs\" in window 1
-        end tell
-        "
-        
-        echo "✅ Terminal tab opened. Server should be starting..."
-        EOF
-        chmod +x artifacts/launch_terminal.sh
-        
-    - name: Create README for release
+    - name: Create usage README
       run: |
         cat > artifacts/README.md << 'EOF'
-        # mcjs
+        # apple-calendar-cli
         
-        macOS Calendar JSON API Server for Grafana integration.
+        One-shot macOS Calendar (EventKit) JSON exporter.
         
-        ## Setup
-        
-        1. Create configuration file:
+        ## Quick Start
         ```bash
-        mkdir -p ~/.mcjs
-        cat > ~/.mcjs/config.yaml << 'YAML'
-        calendars:
-          - "Calendar Name 1"
-          - "Calendar Name 2"
-        timezone: "Asia/Tokyo"
-        YAML
+        ./apple-calendar --pretty
         ```
         
-        2. Grant calendar access:
-        - Open System Settings > Privacy & Security > Calendar
-        - Allow mcjs or Terminal to access Calendar
-        
-        ## Usage
-        
-        ### Option 1: Direct execution
+        ## Filtering Examples
         ```bash
-        ./mcjs
+        ./apple-calendar --exclude-all-day
+        ./apple-calendar --exclude-long-event
+        ./apple-calendar --calendars "Work,Private" --limit 10
         ```
         
-        ### Option 2: Launch in Terminal.app (Recommended for calendar permissions)
+        ## Build From Source
         ```bash
-        ./launch_terminal.sh
+        swift build -c release
+        ./.build/release/apple-calendar
         ```
         
-        ## API Endpoints
-        
-        - `GET /calendars` - List available calendars
-        - `GET /events` - Query events with parameters (from, to, calendars)
-        - `GET /upcoming` - Get next 5 upcoming events (excludes all-day events)
-        - `GET /healthz` - Health check
-        
-        ## Configuration
-        
-        Environment variables:
-        - `HOST` - Bind address (default: 127.0.0.1)
-        - `PORT` - Port number (default: 8620)
-        - `CORS_ORIGIN` - CORS origin (default: all origins)
-        
-        ## Examples
-        
-        ```bash
-        # Get upcoming events
-        curl http://localhost:8620/upcoming | jq
-        
-        # Get events for specific time range
-        curl "http://localhost:8620/events?from=1696588800000&to=1696675200000" | jq
-        ```
+        ## License
+        MIT
         EOF
+        
         
     - name: Create archive
       run: |
         cd artifacts
-        tar -czf ../mcjs-${{ github.ref_name }}-universal.tar.gz *
+        tar -czf ../apple-calendar-cli-${{ github.ref_name }}-universal.tar.gz *
         cd ..
         
     - name: Generate release notes
@@ -142,32 +90,26 @@ jobs:
         else
           TAG="${{ github.ref_name }}"
         fi
-        
-        cat > release_notes.md << EOF
-        # mcjs ${TAG}
-        
-        ## Features
-        - macOS Calendar integration via EventKit
-        - JSON API for Grafana integration
-        - Configurable calendar filtering
-        - Timezone support
-        - All-day event filtering
-        - Long-term event display rules (3-hour limit)
-        
-        ## Installation
-        1. Download and extract \`mcjs-${TAG}-universal.tar.gz\`
-        2. Create configuration file at \`~/.mcjs/config.yaml\`
-        3. Grant calendar permissions in System Settings
-        4. Run \`./launch_terminal.sh\` or \`./mcjs\`
-        
-        ## System Requirements
-        - macOS 13.0 or later
-        - Calendar access permissions
-        
-        ## API Documentation
-        See README.md in the archive for detailed API usage.
-        EOF
-        
+        cat > release_notes.md <<'EOF'
+# apple-calendar-cli ${TAG}
+
+## Features
+- Apple Calendar CLI for macOS (EventKit)
+- Calendar name filtering
+- Optional exclusion of all-day and long events
+- Pretty-print JSON output option
+- Universal binary (arm64 + x86_64)
+
+## Installation
+1. Download and extract `apple-calendar-cli-${TAG}-universal.tar.gz`
+2. Grant calendar permission on first run
+3. Execute `./apple-calendar --help`
+
+## System Requirements
+- macOS 13.0 or later
+- Calendar access permissions
+EOF
+
         echo "notes<<EOF" >> $GITHUB_OUTPUT
         cat release_notes.md >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
@@ -176,10 +118,10 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
-        name: mcjs ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
+        name: apple-calendar-cli ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
         body: ${{ steps.release_notes.outputs.notes }}
         files: |
-          mcjs-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}-universal.tar.gz
+          apple-calendar-cli-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}-universal.tar.gz
         draft: false
         prerelease: false
       env:

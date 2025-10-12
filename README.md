@@ -1,233 +1,159 @@
-# mcjs
-macOS Calendar JSON API Server
+# apple-calendar-cli
 
-macOSのカレンダー.app (EventKit) から予定を取得し、JSON APIとして配信するサーバーです。  
-GrafanaのJSON APIデータソースとの連携や、カレンダーデータの可視化に最適です。
+Calendar CLI for macOS
 
-## ✨ 特徴
+## ✨ Features
 
-- 🗓️ **設定ベースのカレンダーフィルタリング** - YAMLファイルで対象カレンダーを指定
-- ⏰ **タイムゾーン対応** - 設定可能なタイムゾーンでの時刻表示
-- 🚫 **スマートフィルタリング** - 全日イベント除外、長期イベントの3時間表示制限
-- 📊 **Grafana連携** - JSON APIプラグインに最適化されたエンドポイント
-- 🔧 **VS Code統合** - 完全なデバッグ・タスク設定同梱
+- 🗓️ **Calendar filtering** (`--calendars Work,Private`)
+- ⏰ **Readable time strings** (`startFormatted` / `endFormatted` in system timezone)
+- 🚫 **Filters (opt-in exclusions)**: All-day events & long events (>=24h) are included by default; exclude via flags
+- 🎯 **Result limiting**: Default window is now → +30 days, returning up to 5 events (`--limit`)
+- 🧪 **Pure CLI**: No server. Human-readable text by default, JSON via `--format json` (logs/errors to stderr)
+- 🛠️ **Flexible options**: Range, limit, pretty-print, calendar selection, selective exclusions
 
 ---
 
-## 🛠️ セットアップ
+## 🛠️ Setup
 
-### 1. 要件
-- macOS 13.0以降
-- Xcode Command Line Tools (Swift 5.9)
-- カレンダーへのアクセス権限
+### 1. Requirements
 
-### 2. インストール
+- macOS 13.0+
+- Xcode Command Line Tools (Swift 5.9 or later)
+- Calendar (EventKit) permission granted
+
+### 2. Install
 ```bash
 git clone https://github.com/legnoh/mcj.git
-cd mcj
+cd mcj  # (repository rename pending if desired)
 swift build
 ```
 
-### 3. 設定ファイル作成
+### 3. Configuration
+No external config files. All calendars are queried in the system timezone.
+
+### 4. Examples
 ```bash
-mkdir -p ~/.mcjs
-cat > ~/.mcjs/config.yaml << 'EOF'
-calendars:
-  - "カレンダー"
-  - "仕事"
-  - "プライベート"
-timezone: "Asia/Tokyo"
-EOF
+# Default (now → +30d, limit 5, human-readable text)
+swift run apple-calendar
+
+# JSON output (same data as text mode)
+swift run apple-calendar --format json | jq
+
+# Custom range (epoch ms)
+NOW_MS=$(($(date +%s)*1000))
+NEXT_DAY_MS=$((NOW_MS + 24*3600*1000))
+swift run apple-calendar --from $NOW_MS --to $NEXT_DAY_MS --limit 20 --pretty
+
+# Exclude all-day events
+swift run apple-calendar --exclude-all-day
+
+# Hide long (>=24h) events after 3h
+swift run apple-calendar --exclude-long-event
+
+# Filter calendars (comma separated, case-insensitive)
+swift run apple-calendar --calendars "Work,Private"
 ```
 
-### 4. サーバー起動
+### 5. Help
 ```bash
-# Terminal.appで起動（推奨 - カレンダーアクセス権限のため）
-./launch_terminal.sh
-
-# または直接起動
-swift run mcjs
+swift run apple-calendar --help
 ```
 
 ---
 
-## 📡 API エンドポイント
+## 🔄 Processing Flow
+1. Query EventKit for range (`--from/--to`; defaults: now → now+30d)
+2. If `--calendars` provided, filter to those calendar titles (case-insensitive)
+3. Apply exclusions: `--exclude-all-day`, `--exclude-long-event`
+4. Apply limit (`--limit`, 0 = unlimited)
+5. Encode as JSON (if `--format json`) or render text lines → stdout
 
-### `/upcoming`
-直近5件のイベント（全日イベント除外、長期イベント3時間制限適用）
-```bash
-curl http://localhost:8620/upcoming | jq
-```
-
-### `/events`
-期間とカレンダーを指定してイベント取得
-```bash
-# 直近1週間のイベント
-FROM=$(($(date +%s) * 1000))
-TO=$((($(date +%s) + 7*24*3600) * 1000))
-curl "http://localhost:8620/events?from=$FROM&to=$TO" | jq
-
-# 特定カレンダーのみ
-curl "http://localhost:8620/events?from=$FROM&to=$TO&calendars=仕事,プライベート" | jq
-```
-
-### `/calendars`
-利用可能なカレンダー一覧
-```bash
-curl http://localhost:8620/calendars | jq
-```
-
-### `/healthz`
-ヘルスチェック
-```bash
-curl http://localhost:8620/healthz | jq
-```
-
-## 📊 レスポンス形式
-
-### EventDTO
+## 📊 Output JSON (EventDTO)
 ```json
 {
   "id": "event-id",
-  "calendar": "カレンダー",
-  "title": "会議",
-  "location": "会議室A",
-  "notes": "議事録を準備",
+  "calendar": "Work",
+  "title": "Team Meeting",
+  "location": "Room A",
+  "notes": "Prepare agenda",
   "isAllDay": false,
   "start": 1633507200000,
   "end": 1633510800000,
-  "startFormatted": "10/06(水) 14:00",
-  "endFormatted": "10/06(水) 15:00",
+  "startFormatted": "10/06(Wed) 14:00",
+  "endFormatted": "10/06(Wed) 15:00",
   "url": "https://example.com/meeting",
-  "attendees": ["田中太郎", "佐藤花子"]
+  "attendees": ["Taro Tanaka", "Hanako Sato"]
 }
 ```
 
 ---
 
-## 🎯 Grafana連携
+## ⚙️ Configuration
+Nothing to configure. All calendars, system timezone.
 
-### データソース設定
-- **Type**: JSON API
-- **URL**: `http://localhost:8620`
-
-### パネル設定例
-
-#### 1. 今後の予定表示
-- **Query**: `/upcoming`
-- **Visualization**: Table
-- **Columns**: `title`, `calendar`, `startFormatted`, `endFormatted`, `location`
-
-#### 2. 期間指定イベント表示
-- **Query**: `/events?from=$__from&to=$__to`
-- **Time Range**: Grafana時間範囲使用
-- **Visualization**: Table / Timeline
+## 🧪 Filtering Summary
+| Aspect | Default | Option |
+|--------|---------|--------|
+| All-day events | Included | `--exclude-all-day` |
+| Long events (>=24h) after 3h | Shown | `--exclude-long-event` |
+| Calendars | All | `--calendars <a,b,...>` |
+| Limit | 5 | `--limit <n>` (0=unlimited) |
+| Output format | text | `--format json` or `--format text` |
+| Range | now → +30d | `--from / --to` (epoch ms) |
 
 ---
 
-## ⚙️ 設定
-
-### 環境変数
+## 🔧 Development
 ```bash
-HOST=127.0.0.1    # バインドアドレス（デフォルト: 127.0.0.1）
-PORT=8620         # ポート番号（デフォルト: 8620）
-CORS_ORIGIN=*     # CORS設定（デフォルト: 全てのオリジンを許可）
+swift build
+swift run apple-calendar --format json --pretty
 ```
 
-### 設定ファイル（~/.mcjs/config.yaml）
-```yaml
-calendars:          # 対象カレンダー名のリスト
-  - "カレンダー"     # 設定したカレンダーのみが対象となる
-  - "仕事"          # 設定がない場合は全カレンダーが対象
-  - "プライベート"
-timezone: "Asia/Tokyo"  # タイムゾーン（デフォルト: システムのタイムゾーン）
-```
-
-### フィルタリング機能
-
-#### 全日イベント除外（/upcomingのみ）
-全日イベントは`/upcoming`エンドポイントから除外されます。
-
-#### 長期イベント制限
-1日以上続くイベントは、開始から3時間経過後に表示されなくなります。
-- 例：3日間の会議 → 開始から3時間後に非表示
-- 例：30分の打ち合わせ → 常に表示（1日未満のため）
-
----
-
-## 🔧 開発環境
-
-### VS Code統合
+### Manual build / run
 ```bash
-# タスク実行
-Cmd+Shift+P → "Tasks: Run Task"
-- Build
-- Run
-- Build Release
-
-# デバッグ実行
-F5 または "Run and Debug" → "🚀 Launch in Terminal"
-```
-
-### 手動ビルド・実行
-```bash
-# デバッグビルド
+# Debug build
 swift build
 
-# リリースビルド
+# Release build
 swift build -c release
 
-# 直接実行
-swift run mcjs
+# Run
+swift run apple-calendar
 
-# Terminal.app起動（推奨）
-./launch_terminal.sh
+# (Grant calendar permission when prompted on first run)
 ```
 
 ---
 
 ## 🚀 GitHub Releases
 
-### 自動リリース
+### Automatic release
 ```bash
-# タグ作成でリリース
+# Tag & push to release
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-GitHub Actionsが自動でUniversal Binary（Intel + Apple Silicon）をビルド・リリースします。
+GitHub Actions builds and publishes a Universal Binary (Intel + Apple Silicon).
 
-### 手動リリース
-GitHubの「Actions」タブから「Release」ワークフローを手動実行可能です。
+### Manual release
+Trigger the Release workflow from the Actions tab if needed.
 
 ---
 
-## ❓ トラブルシューティング
-
-### カレンダーアクセス権限
+## ❓ Troubleshooting
+### Calendar permission
 ```bash
-# 権限リセット
 tccutil reset Calendar
-
-# システム設定で手動許可
-# System Settings > Privacy & Security > Calendar
+# System Settings > Privacy & Security > Calendar → allow apple-calendar
 ```
 
-### コード署名（必要に応じて）
+### Quick check
 ```bash
-codesign -s - --force .build/debug/mcjs
-```
-
-### ネットワーク接続確認
-```bash
-# サーバー起動確認
-curl http://localhost:8620/healthz
-
-# ポート使用状況
-lsof -i :8620
+swift run apple-calendar --limit 3 --pretty
 ```
 
 ---
 
-## 📄 ライセンス
-MIT License - [LICENSE](LICENSE) ファイルを参照
+## 📄 License
+MIT License - see [LICENSE](LICENSE)

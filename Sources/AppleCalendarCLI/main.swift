@@ -1,0 +1,214 @@
+import Foundation
+import EventKit
+
+// MARK: - Models
+struct EventDTO: Codable {
+    let id: String
+    let calendar: String
+    let title: String
+    let location: String?
+    let notes: String?
+    let isAllDay: Bool
+    let start: Int64   // epoch ms
+    let end: Int64     // epoch ms
+    let startFormatted: String
+    let endFormatted: String
+    let url: String?
+    let attendees: [String]?
+}
+
+// MARK: - Helpers
+func toMs(_ date: Date) -> Int64 { Int64(date.timeIntervalSince1970 * 1000) }
+
+func formatDate(_ date: Date, tz: TimeZone) -> String {
+    let f = DateFormatter()
+    f.dateFormat = "MM/dd(E) HH:mm"
+    f.timeZone = tz
+    f.locale = Locale(identifier: "ja_JP")
+    return f.string(from: date)
+}
+
+enum OutputFormat: String { case text, json }
+
+struct CLIOptions {
+    var from: Date
+    var to: Date
+    var limit: Int = 5
+    // Filters (default: include all events)
+    var excludeAllDay = false            // if true, remove all-day events
+    var excludeLongEvent = false         // if true, hide long (>=24h) events after 3h
+    var pretty = false                   // only meaningful for json
+    var calendars: [String] = [] // case-insensitive match
+    var format: OutputFormat = .text
+}
+
+func parseArgs() -> CLIOptions {
+    var opts = CLIOptions(
+        from: Date(),
+        to: Calendar.current.date(byAdding: .day, value: 30, to: Date()) ?? Date()
+    )
+
+    // 引数を一旦配列に展開し、--flag=value 形式を --flag value に正規化
+    var normalized: [String] = []
+    for raw in CommandLine.arguments.dropFirst() { // drop executable name
+        if raw.hasPrefix("--"), let eq = raw.firstIndex(of: "=") {
+            let flag = String(raw[..<eq])
+            let value = String(raw[raw.index(after: eq)...])
+            if !value.isEmpty {
+                normalized.append(flag)
+                normalized.append(value)
+            } else {
+                normalized.append(flag) // 空値は後段で通常の次引数不足として扱う
+            }
+        } else {
+            normalized.append(raw)
+        }
+    }
+
+    var it = normalized.makeIterator()
+    while let arg = it.next() {
+        switch arg {
+        case "--from": if let v = it.next(), let ms = Int64(v) { opts.from = Date(timeIntervalSince1970: TimeInterval(ms)/1000) }
+        case "--to": if let v = it.next(), let ms = Int64(v) { opts.to = Date(timeIntervalSince1970: TimeInterval(ms)/1000) }
+        case "--limit": if let v = it.next(), let l = Int(v) { opts.limit = l }
+        case "--exclude-all-day": opts.excludeAllDay = true
+        case "--exclude-long-event": opts.excludeLongEvent = true
+        case "--pretty": opts.pretty = true
+        case "--format":
+            if let v = it.next(), let f = OutputFormat(rawValue: v.lowercased()) {
+                opts.format = f
+            } else {
+                FileHandle.standardError.write(Data("--format requires one of: text,json\n".utf8))
+                printUsageAndExit(exitCode: 1)
+            }
+        case "--calendars":
+            if let v = it.next() {
+                opts.calendars = v.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            } else {
+                FileHandle.standardError.write(Data("--calendars requires a comma separated value list\n".utf8))
+                printUsageAndExit(exitCode: 1)
+            }
+        case "--help", "-h":
+            printUsageAndExit()
+        default:
+            FileHandle.standardError.write(Data("Unknown option: \(arg)\n".utf8))
+            printUsageAndExit(exitCode: 1)
+        }
+    }
+    return opts
+}
+
+func printUsageAndExit(exitCode: Int32 = 0) -> Never {
+    print("""
+apple-calendar-cli - macOS Calendar JSON extractor (one-shot)
+
+Usage: apple-calendar-cli [options]
+
+Options:
+    --from <ms>              Start time (epoch ms). Default: now        (also --from=123)
+    --to <ms>                End time (epoch ms). Default: now + 30d    (also --to=123)
+    --limit <n>              Limit number of events (default 5, 0 = no limit) (also --limit=10)
+  --exclude-all-day        Exclude all-day events (default: include)
+  --exclude-long-event     Hide long (>=24h) events after 3h from start (default: keep)
+    --calendars list         Comma separated calendar names to include (case-insensitive) (also --calendars=A,B)
+    --format <text|json>     Output format (default: text) (also --format=json)
+    --pretty                 Pretty-print JSON (only if --format json)
+  -h, --help               Show this help
+""")
+    exit(exitCode)
+}
+
+// MARK: - Calendar Fetch
+func fetchEvents(store: EKEventStore, from: Date, to: Date, tz: TimeZone, calendars filter: [String]) -> [EventDTO] {
+    let lower = Set(filter.map { $0.lowercased() })
+    let cals: [EKCalendar]?
+    if lower.isEmpty {
+        cals = nil // all
+    } else {
+        cals = store.calendars(for: .event).filter { lower.contains($0.title.lowercased()) }
+    }
+    let predicate = store.predicateForEvents(withStart: from, end: to, calendars: cals)
+    let events = store.events(matching: predicate)
+    return events.map { ev in
+        EventDTO(
+            id: ev.eventIdentifier,
+            calendar: ev.calendar.title,
+            title: ev.title ?? "(no title)",
+            location: ev.location,
+            notes: ev.notes,
+            isAllDay: ev.isAllDay,
+            start: toMs(ev.startDate),
+            end: toMs(ev.endDate),
+            startFormatted: formatDate(ev.startDate, tz: tz),
+            endFormatted: formatDate(ev.endDate, tz: tz),
+            url: ev.url?.absoluteString,
+            attendees: ev.attendees?.compactMap { $0.name }
+        )
+    }.sorted { $0.start < $1.start }
+}
+
+// MARK: - Main Flow
+@main
+enum Run {
+    static func main() async {
+        let options = parseArgs()
+        let tz = TimeZone.current
+
+        let store = EKEventStore()
+        let granted = await withCheckedContinuation { cont in
+            store.requestAccess(to: .event) { ok, _ in cont.resume(returning: ok) }
+        }
+        guard granted else {
+            FileHandle.standardError.write(Data("Calendar access not granted.\n".utf8))
+            exit(1)
+        }
+
+        var events = fetchEvents(store: store,
+                                 from: options.from,
+                                 to: options.to,
+                                 tz: tz,
+                                 calendars: options.calendars)
+
+        // Filters
+        if options.excludeAllDay { events.removeAll { $0.isAllDay } }
+        if options.excludeLongEvent {
+            let now = Date()
+            events.removeAll { e in
+                let duration = TimeInterval(e.end - e.start) / 1000
+                if duration >= 86400 { // long event
+                    let start = Date(timeIntervalSince1970: TimeInterval(e.start)/1000)
+                    return now >= start.addingTimeInterval(10800) // hide after 3h
+                }
+                return false
+            }
+        }
+        if options.limit > 0 { events = Array(events.prefix(options.limit)) }
+
+        switch options.format {
+        case .json:
+            let encoder = JSONEncoder()
+            if options.pretty { encoder.outputFormatting = [.prettyPrinted, .sortedKeys] }
+            do {
+                let data = try encoder.encode(events)
+                FileHandle.standardOutput.write(data)
+                if options.pretty { FileHandle.standardOutput.write(Data("\n".utf8)) }
+            } catch {
+                FileHandle.standardError.write(Data("Failed to encode JSON: \(error)\n".utf8))
+                exit(1)
+            }
+        case .text:
+            // Simple human-readable table-ish output
+            // IDは省略し開始時刻昇順。最大幅制御はシンプルに。
+            let df = DateFormatter()
+            df.dateFormat = "yyyy-MM-dd HH:mm"
+            df.timeZone = tz
+            for e in events {
+                let start = Date(timeIntervalSince1970: TimeInterval(e.start)/1000)
+                let end = Date(timeIntervalSince1970: TimeInterval(e.end)/1000)
+                let line = "\(df.string(from: start)) - \(df.string(from: end)) | \(e.calendar) | \(e.title)\(e.isAllDay ? " [AllDay]" : "")"
+                FileHandle.standardOutput.write(Data(line.utf8))
+                FileHandle.standardOutput.write(Data("\n".utf8))
+            }
+        }
+    }
+}

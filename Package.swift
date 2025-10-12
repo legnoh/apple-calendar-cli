@@ -2,25 +2,18 @@
 import PackageDescription
 
 let package = Package(
-    name: "mcjs",
+    name: "apple-calendar-cli",
     platforms: [
         .macOS(.v13)
     ],
     products: [
-        .executable(name: "mcjs", targets: ["App"])
+        .executable(name: "apple-calendar", targets: ["AppleCalendarCLI"])
     ],
-    dependencies: [
-        .package(url: "https://github.com/vapor/vapor", from: "4.92.0"),
-        .package(url: "https://github.com/jpsim/Yams.git", from: "5.0.6")
-    ],
+    dependencies: [],
     targets: [
         .executableTarget(
-            name: "App",
-            dependencies: [
-                .product(name: "Vapor", package: "vapor"),
-                .product(name: "Yams", package: "Yams")
-            ],
-
+            name: "AppleCalendarCLI",
+            dependencies: [],
             linkerSettings: [
                 .linkedFramework("EventKit")
             ]
