@@ -1,4 +1,4 @@
-name: Release (apple-calendar-cli)
+name: Release
 
 on:
   push:
@@ -43,8 +43,8 @@ jobs:
       
     - name: Copy binary to artifacts
       run: |
-        cp .build/apple/Products/Release/apple-calendar-cli artifacts/
-        chmod +x artifacts/apple-calendar-cli
+        cp .build/apple/Products/Release/apple-calendar artifacts/
+        chmod +x artifacts/apple-calendar
         
     - name: Create usage README
       run: |
