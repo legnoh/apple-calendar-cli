@@ -20,11 +20,11 @@ struct EventDTO: Codable {
 // MARK: - Helpers
 func toMs(_ date: Date) -> Int64 { Int64(date.timeIntervalSince1970 * 1000) }
 
-func formatDate(_ date: Date, tz: TimeZone) -> String {
+func formatDate(_ date: Date, tz: TimeZone, locale: Locale) -> String {
     let f = DateFormatter()
     f.dateFormat = "MM/dd(E) HH:mm"
     f.timeZone = tz
-    f.locale = Locale(identifier: "ja_JP")
+    f.locale = locale
     return f.string(from: date)
 }
 
@@ -40,6 +40,7 @@ struct CLIOptions {
     var pretty = false                   // only meaningful for json
     var calendars: [String] = [] // case-insensitive match
     var format: OutputFormat = .text
+    var locale: Locale = .autoupdatingCurrent
 }
 
 // 相対時間指定をパース: 例 +3600, -1800, +1h30m, -2d, +3h10m5s, +1d2h, など。
@@ -139,6 +140,19 @@ func parseArgs() -> CLIOptions {
                 FileHandle.standardError.write(Data("--calendars requires a comma separated value list\n".utf8))
                 printUsageAndExit(exitCode: 1)
             }
+        case "--locale":
+            if let v = it.next() {
+                // 入力例: en_US, ja_JP, fr_FR, de, zh-Hans
+                let trimmed = v.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.isEmpty {
+                    FileHandle.standardError.write(Data("--locale requires a non-empty identifier\n".utf8))
+                    printUsageAndExit(exitCode: 1)
+                }
+                opts.locale = Locale(identifier: trimmed)
+            } else {
+                FileHandle.standardError.write(Data("--locale requires a value (e.g. ja_JP)\n".utf8))
+                printUsageAndExit(exitCode: 1)
+            }
         case "--help", "-h":
             printUsageAndExit()
         default:
@@ -162,15 +176,16 @@ Options:
   --exclude-all-day        Exclude all-day events (default: include)
   --exclude-long-event     Hide long (>=24h) events after 3h from start (default: keep)
   --calendars list         Comma separated calendar names to include (case-insensitive) (also --calendars=A,B)
-  --format <text|json>     Output format (default: text) (also --format=json)
+    --format <text|json>     Output format (default: text) (also --format=json)
   --pretty                 Pretty-print JSON (only if --format json)
+    --locale <id>            Locale identifier (default: system). Example: ja_JP, en_US, fr_FR
   -h, --help               Show this help
 """)
     exit(exitCode)
 }
 
 // MARK: - Calendar Fetch
-func fetchEvents(store: EKEventStore, from: Date, to: Date, tz: TimeZone, calendars filter: [String]) -> [EventDTO] {
+func fetchEvents(store: EKEventStore, from: Date, to: Date, tz: TimeZone, calendars filter: [String], locale: Locale) -> [EventDTO] {
     let lower = Set(filter.map { $0.lowercased() })
     let cals: [EKCalendar]?
     if lower.isEmpty {
@@ -190,8 +205,8 @@ func fetchEvents(store: EKEventStore, from: Date, to: Date, tz: TimeZone, calend
             isAllDay: ev.isAllDay,
             start: toMs(ev.startDate),
             end: toMs(ev.endDate),
-            startFormatted: formatDate(ev.startDate, tz: tz),
-            endFormatted: formatDate(ev.endDate, tz: tz),
+            startFormatted: formatDate(ev.startDate, tz: tz, locale: locale),
+            endFormatted: formatDate(ev.endDate, tz: tz, locale: locale),
             url: ev.url?.absoluteString,
             attendees: ev.attendees?.compactMap { $0.name }
         )
@@ -202,7 +217,7 @@ func fetchEvents(store: EKEventStore, from: Date, to: Date, tz: TimeZone, calend
 @main
 enum Run {
     static func main() async {
-        let options = parseArgs()
+    let options = parseArgs()
         let tz = TimeZone.current
 
         let store = EKEventStore()
@@ -214,11 +229,12 @@ enum Run {
             exit(1)
         }
 
-        var events = fetchEvents(store: store,
-                                 from: options.from,
-                                 to: options.to,
-                                 tz: tz,
-                                 calendars: options.calendars)
+    var events = fetchEvents(store: store,
+                 from: options.from,
+                 to: options.to,
+                 tz: tz,
+                 calendars: options.calendars,
+                 locale: options.locale)
 
         // Filters
         if options.excludeAllDay { events.removeAll { $0.isAllDay } }
@@ -233,7 +249,14 @@ enum Run {
                 return false
             }
         }
-        if options.limit > 0 { events = Array(events.prefix(options.limit)) }
+        if options.limit > 0 {
+            let originalCount = events.count
+            if originalCount > options.limit {
+                events = Array(events.prefix(options.limit))
+                let truncated = originalCount - events.count
+                FileHandle.standardError.write(Data("[info] truncated \(truncated) events (showing first \(events.count)); use --limit 0 to show all within range\n".utf8))
+            }
+        }
 
         switch options.format {
         case .json:
@@ -251,12 +274,28 @@ enum Run {
             // Simple human-readable table-ish output
             // IDは省略し開始時刻昇順。最大幅制御はシンプルに。
             let df = DateFormatter()
-            df.dateFormat = "yyyy-MM-dd HH:mm"
+            df.dateFormat = "MM/dd(E) HH:mm"
             df.timeZone = tz
+            df.locale = options.locale
+            // 同日イベント終了時刻の日付省略用フォーマッタ (時刻のみ)
+            let tf = DateFormatter()
+            tf.dateFormat = "HH:mm"
+            tf.timeZone = tz
+            tf.locale = options.locale
+            let cal = Calendar.current
             for e in events {
                 let start = Date(timeIntervalSince1970: TimeInterval(e.start)/1000)
                 let end = Date(timeIntervalSince1970: TimeInterval(e.end)/1000)
-                let line = "\(df.string(from: start)) - \(df.string(from: end)) | \(e.calendar) | \(e.title)\(e.isAllDay ? " [AllDay]" : "")"
+                let endStr: String
+                if cal.isDate(start, inSameDayAs: end) { // 同日内完結
+                    // 開始と終了が同日なら終了側は時刻のみ
+                    endStr = tf.string(from: end)
+                } else {
+                    endStr = df.string(from: end)
+                }
+                // 出力形式:  MM/dd(E) HH:mm - HH:mm | Title (Calendar)[AllDay]
+                let calSuffix = " (\(e.calendar))"
+                let line = "\(df.string(from: start))-\(endStr) | \(e.title)\(calSuffix)\(e.isAllDay ? " [AllDay]" : "")"
                 FileHandle.standardOutput.write(Data(line.utf8))
                 FileHandle.standardOutput.write(Data("\n".utf8))
             }

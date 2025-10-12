@@ -49,6 +49,7 @@ swift run apple-calendar --from +0 --to +1d --limit 20
 swift run apple-calendar --from -1h --to +2h --format json
 swift run apple-calendar --from +0 --to +90m --exclude-all-day
 swift run apple-calendar --from +0 --to +1d2h30m --pretty
+swift run apple-calendar --to +365d --limit 0  # 1 year ahead, no limit
 
 # Exclude all-day events
 swift run apple-calendar --exclude-all-day
@@ -58,6 +59,9 @@ swift run apple-calendar --exclude-long-event
 
 # Filter calendars (comma separated, case-insensitive)
 swift run apple-calendar --calendars "Work,Private"
+ 
+# Override locale (default: system locale)
+swift run apple-calendar --locale en_US --to +7d --limit 0
 ```
 
 ### 5. Help
@@ -73,6 +77,11 @@ swift run apple-calendar --help
 3. Apply exclusions: `--exclude-all-day`, `--exclude-long-event`
 4. Apply limit (`--limit`, 0 = unlimited)
 5. Encode as JSON (if `--format json`) or render text lines → stdout
+   - Text format pattern: `MM/dd(E) HH:mm - HH:mm | Title (Calendar)[AllDay]`
+     - Same-day events: end side date omitted (time only)
+     - Cross-day events: both ends show full `MM/dd(E) HH:mm`
+     - Calendar name follows title in parentheses
+     - `[AllDay]` suffix for all-day events
 
 ## 📊 Output JSON (EventDTO)
 ```json
@@ -105,7 +114,8 @@ Nothing to configure. All calendars, system timezone.
 | Calendars | All | `--calendars <a,b,...>` |
 | Limit | 5 | `--limit <n>` (0=unlimited) |
 | Output format | text | `--format json` or `--format text` |
-| Range | now → +30d | `--from / --to` (epoch seconds or relative spec e.g. +1h30m, -2d) |
+| Range | now → +30d | `--from / --to` (epoch seconds or relative: +1h30m, -2d, +365d) |
+| Locale | System | `--locale <id>` (e.g. ja_JP, en_US) |
 
 ---
 
@@ -157,6 +167,19 @@ tccutil reset Calendar
 ### Quick check
 ```bash
 swift run apple-calendar --limit 3 --pretty
+```
+
+### Missing far-future events (e.g., next April)
+1. Increase range: `--to +365d` (or larger)
+2. Remove limit: `--limit 0`
+3. Watch stderr: if you see `[info] truncated ...` raise or disable limit
+4. Remove filters: avoid `--calendars`, `--exclude-all-day`, `--exclude-long-event`
+5. Confirm event exists & is synced in the macOS Calendar app
+
+### Truncation notice
+When events exceed `--limit`, stderr shows for example:
+```
+[info] truncated 12 events (showing first 5); use --limit 0 to show all within range
 ```
 
 ---
