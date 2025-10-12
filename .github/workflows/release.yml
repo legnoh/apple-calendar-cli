@@ -286,10 +286,11 @@ jobs:
           end
         end
         EOF
-        pushd "$TMP" >/dev/null
+        cd "$TMP"
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
         git add ${FORMULA_PATH}
+        git status
         if git diff --quiet; then
           echo "No changes to formula; skipping commit."
         else
@@ -297,4 +298,4 @@ jobs:
           git commit -m "${FORMULA_NAME} ${RELEASE_TAG} (automated)"
           git push origin HEAD:main
         fi
-        popd >/dev/null
+        cd -
