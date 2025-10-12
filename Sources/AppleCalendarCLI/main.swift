@@ -253,8 +253,6 @@ enum Run {
             let originalCount = events.count
             if originalCount > options.limit {
                 events = Array(events.prefix(options.limit))
-                let truncated = originalCount - events.count
-                FileHandle.standardError.write(Data("[info] truncated \(truncated) events (showing first \(events.count)); use --limit 0 to show all within range\n".utf8))
             }
         }
 
