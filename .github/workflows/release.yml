@@ -286,6 +286,8 @@ jobs:
           end
         end
         EOF
+        cat ${FORMULA_PATH}
+        git status
         git add --all
         pushd "$TMP" >/dev/null
         git config user.name "github-actions[bot]"
