@@ -4,36 +4,36 @@
       "type": "swift",
       "request": "launch",
       "args": [],
-      "cwd": "${workspaceFolder:mcj}",
+      "cwd": "${workspaceFolder:apple-calendar-cli}",
       "name": "Debug apple-calendar-cli",
-      "program": "${workspaceFolder:mcj}/.build/debug/apple-calendar-cli",
+      "program": "${workspaceFolder:apple-calendar-cli}/.build/debug/apple-calendar-cli",
       "preLaunchTask": "swift: Build Debug apple-calendar-cli"
     },
     {
       "type": "swift",
       "request": "launch",
       "args": [],
-      "cwd": "${workspaceFolder:mcj}",
+      "cwd": "${workspaceFolder:apple-calendar-cli}",
       "name": "Release apple-calendar-cli",
-      "program": "${workspaceFolder:mcj}/.build/release/apple-calendar-cli",
+      "program": "${workspaceFolder:apple-calendar-cli}/.build/release/apple-calendar-cli",
       "preLaunchTask": "swift: Build Release apple-calendar-cli"
     },
     {
       "type": "swift",
       "request": "launch",
       "args": [],
-      "cwd": "${workspaceFolder:mcj}",
+      "cwd": "${workspaceFolder:apple-calendar-cli}",
       "name": "Debug apple-calendar",
-      "program": "${workspaceFolder:mcj}/.build/debug/apple-calendar",
+      "program": "${workspaceFolder:apple-calendar-cli}/.build/debug/apple-calendar",
       "preLaunchTask": "swift: Build Debug apple-calendar"
     },
     {
       "type": "swift",
       "request": "launch",
       "args": [],
-      "cwd": "${workspaceFolder:mcj}",
+      "cwd": "${workspaceFolder:apple-calendar-cli}",
       "name": "Release apple-calendar",
-      "program": "${workspaceFolder:mcj}/.build/release/apple-calendar",
+      "program": "${workspaceFolder:apple-calendar-cli}/.build/release/apple-calendar",
       "preLaunchTask": "swift: Build Release apple-calendar"
     }
   ]

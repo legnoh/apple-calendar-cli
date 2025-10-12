@@ -23,8 +23,8 @@ Calendar CLI for macOS
 
 ### 2. Install
 ```bash
-git clone https://github.com/legnoh/mcj.git
-cd mcj  # (repository rename pending if desired)
+git clone https://github.com/legnoh/apple-calendar-cli.git
+cd apple-calendar-cli  # (repository rename pending if desired)
 swift build
 ```
 
