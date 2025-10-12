@@ -22,10 +22,37 @@ Calendar CLI for macOS
 - Calendar (EventKit) permission granted
 
 ### 2. Install
+
+#### (A) Homebrew (recommended)
+Tap + install:
+```bash
+brew tap legnoh/etc
+brew install apple-calendar-cli
+```
+Upgrade later:
+```bash
+brew update
+brew upgrade apple-calendar-cli
+```
+Verify version:
+```bash
+apple-calendar --help
+```
+
+#### (B) Download release archive
+1. GitHub Releases から `apple-calendar-cli-<version>-universal.tar.gz` を取得
+2. 展開してパスを通す or カレントで利用:
+  ```bash
+  tar -xzf apple-calendar-cli-vX.Y.Z-universal.tar.gz
+  ./apple-calendar --help
+  ```
+
+#### (C) Build from source
 ```bash
 git clone https://github.com/legnoh/apple-calendar-cli.git
-cd apple-calendar-cli  # (repository rename pending if desired)
-swift build
+cd apple-calendar-cli
+swift build -c release
+./.build/release/apple-calendar --help
 ```
 
 ### 3. Configuration
@@ -141,19 +168,18 @@ swift run apple-calendar
 
 ---
 
-## 🚀 GitHub Releases
+## 🚀 GitHub Releases & Distribution
 
-### Automatic release
+Official artifacts:
+- Universal binary (arm64 + x86_64) – codesigned & notarized
+- Homebrew formula: `brew tap legnoh/etc && brew install apple-calendar-cli`
+
+To cut a release (maintainers):
 ```bash
-# Tag & push to release
-git tag v1.0.0
-git push origin v1.0.0
+git tag vX.Y.Z
+git push origin vX.Y.Z
 ```
-
-GitHub Actions builds and publishes a Universal Binary (Intel + Apple Silicon).
-
-### Manual release
-Trigger the Release workflow from the Actions tab if needed.
+Workflow auto-generates release notes & updates the Homebrew tap.
 
 ---
 
