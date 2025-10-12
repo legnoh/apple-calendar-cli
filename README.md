@@ -40,8 +40,8 @@ apple-calendar --help
 ```
 
 #### (B) Download release archive
-1. GitHub Releases から `apple-calendar-cli-<version>-universal.tar.gz` を取得
-2. 展開してパスを通す or カレントで利用:
+1. Get `apple-calendar-cli-<version>-universal.tar.gz` from GitHub Releases
+2. Edit `$PATH` or Execute directly:
   ```bash
   tar -xzf apple-calendar-cli-vX.Y.Z-universal.tar.gz
   ./apple-calendar --help
@@ -61,39 +61,39 @@ No external config files. All calendars are queried in the system timezone.
 ### 4. Examples
 ```bash
 # Default (now → +30d, limit 5, human-readable text)
-swift run apple-calendar
+apple-calendar
 
 # JSON output (same data as text mode)
-swift run apple-calendar --format json | jq
+apple-calendar --format json | jq
 
 # Custom range (absolute epoch seconds)
 NOW_S=$(date +%s)
 NEXT_DAY_S=$((NOW_S + 24*3600))
-swift run apple-calendar --from $NOW_S --to $NEXT_DAY_S --limit 20 --pretty
+apple-calendar --from $NOW_S --to $NEXT_DAY_S --limit 20 --pretty
 
 # Relative range examples
-swift run apple-calendar --from +0 --to +1d --limit 20
-swift run apple-calendar --from -1h --to +2h --format json
-swift run apple-calendar --from +0 --to +90m --exclude-all-day
-swift run apple-calendar --from +0 --to +1d2h30m --pretty
-swift run apple-calendar --to +365d --limit 0  # 1 year ahead, no limit
+apple-calendar --from +0 --to +1d --limit 20
+apple-calendar --from -1h --to +2h --format json
+apple-calendar --from +0 --to +90m --exclude-all-day
+apple-calendar --from +0 --to +1d2h30m --pretty
+apple-calendar --to +365d --limit 0  # 1 year ahead, no limit
 
 # Exclude all-day events
-swift run apple-calendar --exclude-all-day
+apple-calendar --exclude-all-day
 
 # Hide long (>=24h) events after 3h
-swift run apple-calendar --exclude-long-event
+apple-calendar --exclude-long-event
 
 # Filter calendars (comma separated, case-insensitive)
-swift run apple-calendar --calendars "Work,Private"
+apple-calendar --calendars "Work,Private"
  
 # Override locale (default: system locale)
-swift run apple-calendar --locale en_US --to +7d --limit 0
+apple-calendar --locale en_US --to +7d --limit 0
 ```
 
 ### 5. Help
 ```bash
-swift run apple-calendar --help
+apple-calendar --help
 ```
 
 ---
@@ -119,8 +119,8 @@ swift run apple-calendar --help
   "location": "Room A",
   "notes": "Prepare agenda",
   "isAllDay": false,
-  "start": 1633507200000,
-  "end": 1633510800000,
+  "start": 1633507200,
+  "end": 1633510800,
   "startFormatted": "10/06(Wed) 14:00",
   "endFormatted": "10/06(Wed) 15:00",
   "url": "https://example.com/meeting",
