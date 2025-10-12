@@ -10,6 +10,9 @@ on:
         required: true
         default: 'v0.0.1'
 
+permissions:
+  contents: write
+
 jobs:
   build-and-release:
     runs-on: macos-latest
@@ -244,7 +247,9 @@ jobs:
       with:
         app-id: ${{ vars.G_BUMP_BOT_ID }}
         private-key: ${{ secrets.G_BUMP_BOT_PRIVATEKEY }}
-        # (optionally) owner restriction could be added
+        owner: ${{ github.repository_owner }}
+        repositories: homebrew-etc
+        permission-contents: write
 
     - name: Update Homebrew tap (legnoh/homebrew-etc)
       if: env.RELEASE_TAG != ''
