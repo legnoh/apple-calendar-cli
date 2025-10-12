@@ -55,7 +55,7 @@ jobs:
         grep "static let version" Sources/AppleCalendarCLI/main.swift
       
     - name: Build for release
-      run: swift build -c release --arch arm64 --arch x86_64 -Xswiftc -parse-as-library
+      run: swift build -c release --arch arm64 --arch x86_64
       
     - name: Create artifacts directory
       run: mkdir -p artifacts
