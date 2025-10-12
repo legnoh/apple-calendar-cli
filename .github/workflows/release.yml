@@ -85,8 +85,8 @@ jobs:
         AC_API_PRIVATE_KEY: ${{ secrets.AC_API_PRIVATE_KEY }}
       run: |
         set -euo pipefail
-        echo "$AC_API_PRIVATE_KEY" > AuthKey.p8
-        # store-credentials: profile nameは末尾の位置引数。--keychain-profile は submit 時のみ使用。
+        # Secret はプレーン PEM (改行含む) を想定。必要であれば \n エスケープも解釈。
+        printf "%b" "$AC_API_PRIVATE_KEY" > AuthKey.p8
         xcrun notarytool store-credentials \
           --key AuthKey.p8 \
           --key-id "$AC_API_KEY_ID" \
@@ -97,13 +97,7 @@ jobs:
       run: |
         set -euo pipefail
         xcrun notarytool submit artifacts/apple-calendar.zip --keychain-profile AC_PROFILE --wait --timeout 15m
-
-    - name: Staple ticket
-      run: |
-        set -euo pipefail
-        xcrun stapler staple artifacts/apple-calendar
-        spctl --assess --type execute --verbose artifacts/apple-calendar || true
-        
+   
     - name: Create usage README
       run: |
         cat > artifacts/README.md << 'EOF'
