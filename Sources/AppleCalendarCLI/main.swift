@@ -176,9 +176,9 @@ Options:
   --exclude-all-day        Exclude all-day events (default: include)
   --exclude-long-event     Hide long (>=24h) events after 3h from start (default: keep)
   --calendars list         Comma separated calendar names to include (case-insensitive) (also --calendars=A,B)
-    --format <text|json>     Output format (default: text) (also --format=json)
+  --format <text|json>     Output format (default: text) (also --format=json)
   --pretty                 Pretty-print JSON (only if --format json)
-    --locale <id>            Locale identifier (default: system). Example: ja_JP, en_US, fr_FR
+  --locale <id>            Locale identifier (default: system). Example: ja_JP, en_US, fr_FR
   -h, --help               Show this help
 """)
     exit(exitCode)
