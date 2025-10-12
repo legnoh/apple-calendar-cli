@@ -91,24 +91,24 @@ jobs:
           TAG="${{ github.ref_name }}"
         fi
         cat > release_notes.md <<'EOF'
-# apple-calendar-cli ${TAG}
+        # apple-calendar-cli ${TAG}
 
-## Features
-- Apple Calendar CLI for macOS (EventKit)
-- Calendar name filtering
-- Optional exclusion of all-day and long events
-- Pretty-print JSON output option
-- Universal binary (arm64 + x86_64)
+        ## Features
+        - Apple Calendar CLI for macOS (EventKit)
+        - Calendar name filtering
+        - Optional exclusion of all-day and long events
+        - Pretty-print JSON output option
+        - Universal binary (arm64 + x86_64)
 
-## Installation
-1. Download and extract `apple-calendar-cli-${TAG}-universal.tar.gz`
-2. Grant calendar permission on first run
-3. Execute `./apple-calendar --help`
+        ## Installation
+        1. Download and extract `apple-calendar-cli-${TAG}-universal.tar.gz`
+        2. Grant calendar permission on first run
+        3. Execute `./apple-calendar --help`
 
-## System Requirements
-- macOS 13.0 or later
-- Calendar access permissions
-EOF
+        ## System Requirements
+        - macOS 13.0 or later
+        - Calendar access permissions
+        EOF
 
         echo "notes<<EOF" >> $GITHUB_OUTPUT
         cat release_notes.md >> $GITHUB_OUTPUT
