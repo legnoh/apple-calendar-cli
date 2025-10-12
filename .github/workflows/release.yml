@@ -224,3 +224,76 @@ jobs:
         prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Compute SHA256 for Homebrew formula
+      id: brew_sha
+      run: |
+        set -euo pipefail
+        FILE="apple-calendar-cli-${RELEASE_TAG}-universal.tar.gz"
+        if [ ! -f "$FILE" ]; then
+          echo "File $FILE not found" >&2
+          exit 1
+        fi
+        SHA256=$(shasum -a 256 "$FILE" | awk '{print $1}')
+        echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+        echo "SHA256=$SHA256" >> $GITHUB_ENV
+
+    - name: Generate GitHub App token
+      id: app_token
+      uses: actions/create-github-app-token@v1
+      with:
+        app-id: ${{ vars.G_BUMP_BOT_ID }}
+        private-key: ${{ secrets.G_BUMP_BOT_PRIVATEKEY }}
+        # (optionally) owner restriction could be added
+
+    - name: Update Homebrew tap (legnoh/homebrew-etc)
+      if: env.RELEASE_TAG != ''
+      run: |
+        set -euo pipefail
+        REPO="legnoh/homebrew-etc"
+        TMP=$(mktemp -d)
+        git clone "https://x-access-token:${{ steps.app_token.outputs.token }}@github.com/${REPO}.git" "$TMP"
+        VERSION="${RELEASE_TAG#v}"
+        FORMULA_NAME="apple-calendar-cli"
+        CLASS_NAME="AppleCalendarCli"
+        FORMULA_PATH="$TMP/Formula/${FORMULA_NAME}.rb"
+        URL="https://github.com/legnoh/apple-calendar-cli/releases/download/${RELEASE_TAG}/apple-calendar-cli-${RELEASE_TAG}-universal.tar.gz"
+        SHA256="${{ steps.brew_sha.outputs.sha256 }}"
+        if [ -z "$SHA256" ]; then
+          echo "SHA256 not resolved" >&2
+          exit 1
+        fi
+        mkdir -p "$(dirname "$FORMULA_PATH")"
+        cat > "$FORMULA_PATH" <<EOF
+        class ${CLASS_NAME} < Formula
+          desc "One-shot macOS Calendar (EventKit) exporter (text/JSON)"
+          homepage "https://github.com/legnoh/apple-calendar-cli"
+          url "${URL}"
+          version "${VERSION}"
+          sha256 "${SHA256}"
+          license "MIT"
+
+          def install
+            bin.install "apple-calendar"
+            # Optional: ship README (not required)
+            (prefix/"README.txt").write <<~EOS
+              See: https://github.com/legnoh/apple-calendar-cli
+            EOS
+          end
+
+          test do
+            system "#{bin}/apple-calendar", "--help"
+          end
+        end
+        EOF
+        pushd "$TMP" >/dev/null
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        if git diff --quiet; then
+          echo "No changes to formula; skipping commit."
+        else
+          git add "Formula/${FORMULA_NAME}.rb"
+          git commit -m "${FORMULA_NAME} ${RELEASE_TAG} (automated)"
+          git push origin HEAD:main
+        fi
+        popd >/dev/null
