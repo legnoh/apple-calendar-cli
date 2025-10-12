@@ -20,6 +20,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 変更履歴 (過去タグ差分) のため全履歴取得
       
     - name: Setup Xcode
       uses: maxim-lobanov/setup-xcode@v1
@@ -135,29 +137,75 @@ jobs:
         tar -czf ../apple-calendar-cli-${RELEASE_TAG}-universal.tar.gz apple-calendar README.md
         cd ..
         
-    - name: Generate release notes
+    - name: Generate release notes (with changelog)
       id: release_notes
       run: |
+        set -euo pipefail
         TAG="${RELEASE_TAG}"
-        # ヒアドキュメントのクォートを外して ${TAG} を展開可能にする
+        # 直近の一つ前のタグを取得 (存在しなければ空文字)
+        PREV_TAG=$(git tag --sort=-creatordate | grep -v "^$TAG$" | head -n1 || true)
+        COMPARE_URL=""
+        CHANGELOG=""
+        if [ -n "${PREV_TAG}" ]; then
+          COMPARE_URL="https://github.com/${GITHUB_REPOSITORY}/compare/${PREV_TAG}...${TAG}"
+          # プレーンなコミットメッセージ一覧 (マージコミット除外)
+          CHANGELOG=$(git log "${PREV_TAG}..${TAG}" --pretty=format:'- %s (%h)' --no-merges || true)
+          if [ -z "${CHANGELOG}" ]; then
+            CHANGELOG="(No commits between ${PREV_TAG} and ${TAG})"
+          fi
+        else
+          # 初回リリース (タグ一つのみ)
+          CHANGELOG=$(git log --pretty=format:'- %s (%h)' --no-merges | tail -n 50)
+        fi
+
         cat > release_notes.md <<EOF
         # apple-calendar-cli ${TAG}
 
-        ## Features
-        - Apple Calendar CLI for macOS (EventKit)
-        - Calendar name filtering
-        - Optional exclusion of all-day and long events
-        - Pretty-print JSON output option
-        - Universal binary (arm64 + x86_64)
+        macOS Calendar (EventKit) one-shot exporter. Human-readable text or JSON.
 
-        ## Installation
-        1. Download and extract `apple-calendar-cli-${TAG}-universal.tar.gz`
-        2. Grant calendar permission on first run
-        3. Execute `./apple-calendar --help`
+        ## ✨ Highlights
+        - Locale override: `--locale ja_JP / en_US` (default: system locale)
+        - Text output refinements (same-day end date omission, `Title (Calendar)` placement)
+        - Relative range parsing: +1h30m, -2d, +365d
+        - Truncation notice when `--limit` cuts results
+        - Filters: `--exclude-all-day`, `--exclude-long-event`
+        - Universal binary (arm64 + x86_64), codesigned & notarized
 
-        ## System Requirements
-        - macOS 13.0 or later
-        - Calendar access permissions
+        ## � Changelog
+        Previous tag: ${PREV_TAG:-N/A}
+        ${COMPARE_URL:+Compare: ${COMPARE_URL}}
+
+        ${CHANGELOG}
+
+        ## �🔧 Usage
+        ```bash
+        ./apple-calendar --to +7d --limit 0
+        ./apple-calendar --format json --pretty
+        ./apple-calendar --locale en_US --from +0 --to +1d2h30m
+        ./apple-calendar --calendars "Work,Personal" --exclude-all-day
+        ```
+
+        ## Text Format
+        `MM/dd(E) HH:mm - HH:mm | Title (Calendar)[AllDay]`
+        - Same-day: end time only
+        - Cross-day: full dates
+
+        ## JSON Fields
+        `id, calendar, title, location, notes, isAllDay, start, end, startFormatted, endFormatted, url, attendees`
+
+        ## Install
+        1. Download & extract: `apple-calendar-cli-${TAG}-universal.tar.gz`
+        2. Grant Calendar permission on first run
+        3. Run `./apple-calendar --help`
+
+        ## Requirements
+        - macOS 13.0+
+
+        ## Security
+        - Developer ID signed & notarized
+
+        ## License
+        MIT
         EOF
 
         echo "notes<<EOF" >> $GITHUB_OUTPUT
