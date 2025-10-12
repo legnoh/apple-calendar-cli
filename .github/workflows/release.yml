@@ -286,7 +286,6 @@ jobs:
           end
         end
         EOF
-        cp ${FORMULA_PATH}
         pushd "$TMP" >/dev/null
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
