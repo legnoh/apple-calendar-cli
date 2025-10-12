@@ -86,8 +86,12 @@ jobs:
       run: |
         set -euo pipefail
         echo "$AC_API_PRIVATE_KEY" > AuthKey.p8
-        xcrun notarytool store-credentials --keychain-profile AC_PROFILE \
-          --key AuthKey.p8 --key-id "$AC_API_KEY_ID" --issuer "$AC_API_ISSUER_ID"
+        # store-credentials: profile nameは末尾の位置引数。--keychain-profile は submit 時のみ使用。
+        xcrun notarytool store-credentials \
+          --key AuthKey.p8 \
+          --key-id "$AC_API_KEY_ID" \
+          --issuer "$AC_API_ISSUER_ID" \
+          AC_PROFILE
 
     - name: Notarize (submit & wait)
       run: |
