@@ -171,13 +171,13 @@ jobs:
         - Filters: `--exclude-all-day`, `--exclude-long-event`
         - Universal binary (arm64 + x86_64), codesigned & notarized
 
-        ## � Changelog
+        ## 📝 Changelog
         Previous tag: ${PREV_TAG:-N/A}
         ${COMPARE_URL:+Compare: ${COMPARE_URL}}
 
         ${CHANGELOG}
 
-        ## �🔧 Usage
+        # 🔧 Usage
         ```bash
         ./apple-calendar --to +7d --limit 0
         ./apple-calendar --format json --pretty
