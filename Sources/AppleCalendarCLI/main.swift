@@ -42,6 +42,50 @@ struct CLIOptions {
     var format: OutputFormat = .text
 }
 
+// 相対時間指定をパース: 例 +3600, -1800, +1h30m, -2d, +3h10m5s, +1d2h, など。
+// 返り値: 絶対秒 (since 1970) を TimeInterval で返す。失敗時は nil。
+// 仕様: 先頭が + または - の場合は現在時刻を基準とした相対。数値部分 + 単位 (s,m,h,d) の繰り返しを許可。
+//       単位省略時は秒扱い。例 +300 = +300s。
+//       先頭が数字 (または - なし数字) の場合は従来通り絶対 epoch 秒として解釈。
+func parseTimeSpec(_ raw: String, now: TimeInterval = Date().timeIntervalSince1970) -> TimeInterval? {
+    if raw.isEmpty { return nil }
+    let first = raw.first!
+    if first == "+" || first == "-" {
+        let sign: Double = first == "+" ? 1 : -1
+        let body = String(raw.dropFirst())
+        if body.isEmpty { return nil }
+        // トークン化: 数値+任意単位 の連続。正規表現: (\d+)([smhd]?)
+        let pattern = "^(?:\\d+[smhd]?)+$"
+        if body.range(of: pattern, options: [.regularExpression]) == nil { return nil }
+        var total: Double = 0
+        var numberBuffer = ""
+        for ch in body { // 1 2 h 3 0 m ...
+            if ch.isNumber { numberBuffer.append(ch); continue }
+            // 単位
+            guard !numberBuffer.isEmpty else { return nil }
+            let val = Double(numberBuffer) ?? 0
+            let mult: Double
+            switch ch {
+            case "s": mult = 1
+            case "m": mult = 60
+            case "h": mult = 3600
+            case "d": mult = 86400
+            default: return nil
+            }
+            total += val * mult
+            numberBuffer.removeAll(keepingCapacity: true)
+        }
+        if !numberBuffer.isEmpty { // 単位省略 → 秒
+            total += Double(numberBuffer) ?? 0
+        }
+        return now + sign * total
+    } else {
+        // 絶対秒
+        if let absVal = TimeInterval(raw) { return absVal }
+        return nil
+    }
+}
+
 func parseArgs() -> CLIOptions {
     var opts = CLIOptions(
         from: Date(),
@@ -65,11 +109,18 @@ func parseArgs() -> CLIOptions {
         }
     }
 
+    let nowSec = Date().timeIntervalSince1970
     var it = normalized.makeIterator()
     while let arg = it.next() {
         switch arg {
-        case "--from": if let v = it.next(), let ms = Int64(v) { opts.from = Date(timeIntervalSince1970: TimeInterval(ms)/1000) }
-        case "--to": if let v = it.next(), let ms = Int64(v) { opts.to = Date(timeIntervalSince1970: TimeInterval(ms)/1000) }
+        case "--from":
+            if let v = it.next(), let sec = parseTimeSpec(v, now: nowSec) {
+                opts.from = Date(timeIntervalSince1970: sec)
+            }
+        case "--to":
+            if let v = it.next(), let sec = parseTimeSpec(v, now: nowSec) {
+                opts.to = Date(timeIntervalSince1970: sec)
+            }
         case "--limit": if let v = it.next(), let l = Int(v) { opts.limit = l }
         case "--exclude-all-day": opts.excludeAllDay = true
         case "--exclude-long-event": opts.excludeLongEvent = true
@@ -105,14 +156,14 @@ apple-calendar-cli - macOS Calendar JSON extractor (one-shot)
 Usage: apple-calendar-cli [options]
 
 Options:
-    --from <ms>              Start time (epoch ms). Default: now        (also --from=123)
-    --to <ms>                End time (epoch ms). Default: now + 30d    (also --to=123)
-    --limit <n>              Limit number of events (default 5, 0 = no limit) (also --limit=10)
+  --from <spec>            Start time. Epoch seconds or relative (+1h30m, -2d, +3600). Default: now
+  --to <spec>              End time. Epoch seconds or relative. Default: now + 30d
+  --limit <n>              Limit number of events (default 5, 0 = no limit) (also --limit=10)
   --exclude-all-day        Exclude all-day events (default: include)
   --exclude-long-event     Hide long (>=24h) events after 3h from start (default: keep)
-    --calendars list         Comma separated calendar names to include (case-insensitive) (also --calendars=A,B)
-    --format <text|json>     Output format (default: text) (also --format=json)
-    --pretty                 Pretty-print JSON (only if --format json)
+  --calendars list         Comma separated calendar names to include (case-insensitive) (also --calendars=A,B)
+  --format <text|json>     Output format (default: text) (also --format=json)
+  --pretty                 Pretty-print JSON (only if --format json)
   -h, --help               Show this help
 """)
     exit(exitCode)

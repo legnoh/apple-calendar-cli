@@ -39,10 +39,16 @@ swift run apple-calendar
 # JSON output (same data as text mode)
 swift run apple-calendar --format json | jq
 
-# Custom range (epoch ms)
-NOW_MS=$(($(date +%s)*1000))
-NEXT_DAY_MS=$((NOW_MS + 24*3600*1000))
-swift run apple-calendar --from $NOW_MS --to $NEXT_DAY_MS --limit 20 --pretty
+# Custom range (absolute epoch seconds)
+NOW_S=$(date +%s)
+NEXT_DAY_S=$((NOW_S + 24*3600))
+swift run apple-calendar --from $NOW_S --to $NEXT_DAY_S --limit 20 --pretty
+
+# Relative range examples
+swift run apple-calendar --from +0 --to +1d --limit 20
+swift run apple-calendar --from -1h --to +2h --format json
+swift run apple-calendar --from +0 --to +90m --exclude-all-day
+swift run apple-calendar --from +0 --to +1d2h30m --pretty
 
 # Exclude all-day events
 swift run apple-calendar --exclude-all-day
@@ -99,7 +105,7 @@ Nothing to configure. All calendars, system timezone.
 | Calendars | All | `--calendars <a,b,...>` |
 | Limit | 5 | `--limit <n>` (0=unlimited) |
 | Output format | text | `--format json` or `--format text` |
-| Range | now → +30d | `--from / --to` (epoch ms) |
+| Range | now → +30d | `--from / --to` (epoch seconds or relative spec e.g. +1h30m, -2d) |
 
 ---
 
